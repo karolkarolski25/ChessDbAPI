@@ -45,18 +45,32 @@ def create_user():
     return make_response(jsonify(user_create_response[0]), 400)
 
 
-@app.route('/user/<username>', methods=['GET', 'DELETE', 'PUT'])
+@app.route('/user/<username>', methods=['GET', 'DELETE', 'PATCH', 'PUT'])
 def manage_user(username):
     if request.method == "GET":
         return make_response(jsonify(database.get_user(details=False, username=username)), 200)
     elif request.method == "DELETE":
         return make_response(jsonify(database.delete_user(username)), 200)
-    elif request.method == "PUT":
-        print(request.json)
-        return make_response(jsonify(database.update_user(username, request.json)), 200)
+    elif request.method == "PATCH" or request.method == "PUT":
+        if request.json is not None:
+            return make_response(jsonify(database.update_user(username, request.json)), 200)
+        else:
+            return make_response("No data provided", 400)
     else:
         return make_response("Bad request", 400)
 
+
+@app.route('/game/create', methods=['POST'])
+def create_game_results():
+    game_create_response = database.create_game(request.json)
+    if game_create_response[1]:
+        return make_response(game_create_response[0], 200)
+    return make_response(game_create_response[0], 400)
+
+
+@app.route('/games', methods=['GET'])
+def get_games():
+    return make_response(jsonify(database.get_games()), 200)
 
 if __name__ == '__main__':
     configure()

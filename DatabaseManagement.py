@@ -44,6 +44,43 @@ class DatabaseManagement:
         except Error as e:
             print(e)
 
+    def create_game(self, game_data):
+        try:
+            players_exists_in_database = False
+
+            if self.check_if_user_exists(game_data['user1_username']) and self.check_if_user_exists(game_data['user2_username']):
+                players_exists_in_database = True
+
+            if players_exists_in_database:
+                user1 = self.get_user(username=game_data['user1_username'])[0]
+                user2 = self.get_user(username=game_data['user2_username'])[0]
+                winner_user = self.get_user(username=game_data['winner_username'])[0]
+
+                if winner_user == user1 or winner_user == user2:
+                    self.conn.cursor().execute('''INSERT INTO GamesPlayed (user1_id, user2_id, winner_id, win_type) VALUES (?,?,?,?)''',
+                                               (user1['user_id'], user2['user_id'], winner_user['user_id'], game_data['win_type']))
+                    self.conn.commit()
+
+                    return "Game successfully created", True
+                else:
+                    return "Winner user didn't play.\nEnter correct winner username", False
+
+            else:
+                return "Players don't exist in database", False
+        except Exception as e:
+            if type(e) is Error:
+                return f"Error occurred during creating new game: {e}", False
+            if type(e) is KeyError or type(e) is TypeError:
+                return "Not enough data provided", False
+            if type(e) is IndexError:
+                return "Winner user didn't play.\nEnter correct winner username", False
+
+    def get_games(self):
+        try:
+            return self.format_json(self.conn.cursor().execute('''SELECT * FROM GamesPlayed'''))
+        except Error:
+            return None
+
     def create_user(self, user_data):
         try:
             if not self.check_if_user_exists(user_data['username']):
@@ -71,10 +108,17 @@ class DatabaseManagement:
                 else:
                     return self.format_json(self.conn.cursor().execute('SELECT user_id, username FROM Users'))
             else:
-                return self.format_json(
-                    self.conn.cursor().execute('SELECT * FROM Users WHERE username = ?', (username,)))
+                user_details_json = {
+                    "user_details": self.format_json(self.conn.cursor().execute('''SELECT * from Users WHERE username = ?''', (username,)))[0],
+                    "games_played": self.format_json(self.conn.cursor().execute("""SELECT gp.* from GamesPlayed as gp INNER JOIN Users as u on 
+                                                gp.user1_id = u.user_id WHERE u.username = ? UNION SELECT 
+                                                gp.* from GamesPlayed as gp INNER join Users as u on 
+                                                gp.user2_id = u.user_id WHERE u.username = ?""", (username, username)))
+                }
 
-        except Error:
+                return user_details_json
+
+        except Error as e:
             return None
 
     def check_if_user_exists(self, username):
